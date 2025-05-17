@@ -21,6 +21,7 @@ As a result, I wrote this API-compatible build server that can optionally be dis
 #### Docker
 
 ```bash
+docker build -t proxbuilder:latest .
 docker run --rm -it -p 8080:8080 proxbuilder:latest
 ```
 
