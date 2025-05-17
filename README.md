@@ -36,14 +36,9 @@ Prox Builder can be configured either by specifying command-line flags or by set
 
 URL parameters are as follows:
 
-| Parameter | Description                                                                                                               |
-| --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `os`      | The operating system to build for (e.g., linux, darwin, windows)                                                          |
-| `arch`    | The CPU architecture to build for (e.g., amd64, arm64)                                                                    |
-| `p[]`     | Array of plugin packages to include in the build (e.g., github.com/caddy-dns/cloudflare). Repeat as many times as needed. |
-
-Example URL:
-https://caddyserver.com/api/download?os=linux&arch=amd64&p=github.com%2Fcaddy-dns%2Fcloudflare&p=github.com%2Fss098%2Fcertmagic-s3&p=github.com%2Flindenlab%2Fcaddy-s3-proxy&idempotency=92501081891648
-
-http://localhost:8080/api/download?os=linux&arch=amd64&p=github.com/caddy-dns/cloudflare&p=github.com/ss098/certmagic-s3&p=github.com/lindenlab/caddy-s3-proxy&job_id=776f7f30-85a2-4763-add6-80353bf96b95
-http://localhost:8080/api/download?os=linux&arch=amd64&p=github.com/ss098/certmagic-s3&p=github.com/lindenlab/caddy-s3-proxy&p=github.com/caddy-dns/cloudflare&job_id=776f7f30-85a2-4763-add6-80353bf96b95
+| Parameter       | Description                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `os`            | The operating system to build for (e.g., linux, darwin, windows)                                                          |
+| `arch`          | The CPU architecture to build for (e.g., amd64, arm64)                                                                    |
+| `p[]`           | Array of plugin packages to include in the build (e.g., github.com/caddy-dns/cloudflare). Repeat as many times as needed. |
+| `caddy_version` | The Caddy version to compile against                                                                                      |
