@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PB_AGENT=1
+      - PB_REDIS_HOST=redis
+      - PB_BINARY_PATH=/data
+    depends_on:
+      - redis
+    deploy:
+      replicas: 4
+    volumes:
+      - shared_data:/data
+
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PB_HUB=1
+      - PB_REDIS_HOST=redis
+      - PB_BINARY_PATH=/data
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+    volumes:
+      - shared_data:/data
+
+volumes:
+  shared_data:

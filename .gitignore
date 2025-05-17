@@ -1,0 +1,5 @@
+data/*
+ui/dist
+ui/node_modules
+__debug_bin*
+prox-builder

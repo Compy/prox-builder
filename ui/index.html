@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/src/style.css" rel="stylesheet" />
+    <script type="module" src="/src/main.js"></script>
+    <title>Prox Builder</title>
+  </head>
+  <body>
+    <div x-data="{ sidebarIsOpen: true, modalIsOpen: false }">
+      <!-- Build progress modal -->
+      <div
+        x-cloak
+        x-show="modalIsOpen"
+        x-transition.opacity.duration.200ms
+        x-trap.inert.noscroll="modalIsOpen"
+        class="fixed inset-0 z-30 flex items-end justify-center bg-black/20 p-4 pb-8 backdrop-blur-md sm:items-center lg:p-8"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="defaultModalTitle"
+      >
+        <!-- Modal Dialog -->
+        <div
+          x-show="modalIsOpen"
+          x-transition:enter="transition ease-out duration-200 delay-100 motion-reduce:transition-opacity"
+          x-transition:enter-start="opacity-0"
+          x-transition:enter-end="opacity-100"
+          class="flex max-w-4xl flex-col gap-4 overflow-hidden rounded-radius border border-outline bg-surface text-on-surface dark:border-outline-dark dark:bg-surface-dark-alt dark:text-on-surface-dark"
+        >
+          <!-- Dialog Header -->
+          <div
+            class="flex items-center justify-between border-b border-outline bg-surface-alt/60 p-4 dark:border-outline-dark dark:bg-surface-dark/20"
+          >
+            <h3
+              id="defaultModalTitle"
+              class="font-semibold tracking-wide text-on-surface-strong dark:text-on-surface-dark-strong"
+            >
+              <span
+                :class="{ 'text-green-500': $store.main.buildStatus === 'success', 'text-red-500': $store.main.buildStatus === 'failed' }"
+                x-text="$store.main.buildStatus === 'pending' ? 'Build Progress' : ($store.main.buildStatus === 'success' ? 'Build Success' : 'Build Failed')"
+              ></span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                x-show="$store.main.buildStatus === 'success'"
+                class="lucide lucide-check-icon lucide-check ml-2 inline-block w-5 h-5 text-green-500"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                x-show="$store.main.buildStatus === 'failed'"
+                class="lucide lucide-circle-x-icon lucide-circle-x ml-2 inline-block w-5 h-5 text-red-500"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="m15 9-6 6" />
+                <path d="m9 9 6 6" />
+              </svg>
+              <div
+                x-show="$store.main.buildStatus === 'pending'"
+                class="w-4 h-4 border-t-2 border-b-2 border-t-blue-500 border-b-fuchsia-500 rounded-full animate-spin inline-block ml-2"
+              ></div>
+            </h3>
+            <button
+              x-on:click="modalIsOpen = false"
+              aria-label="close modal"
+              x-show="$store.main.buildStatus !== 'pending'"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                stroke="currentColor"
+                fill="none"
+                stroke-width="1.4"
+                class="w-5 h-5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <!-- Dialog Body -->
+          <div
+            class="px-4 py-4 h-80 w-4xl overflow-y-auto font-mono text-sm"
+            id="buildlog"
+          >
+            <template x-for="(log, index) in $store.main.buildLog" :key="index">
+              <p x-text="log"></p>
+            </template>
+          </div>
+          <!-- Dialog Footer -->
+          <div
+            class="flex flex-col-reverse justify-between gap-2 border-t border-outline bg-surface-alt/60 p-4 dark:border-outline-dark dark:bg-surface-dark/20 sm:flex-row sm:items-center md:justify-end"
+          >
+            <button
+              x-show="$store.main.buildStatus === 'failed'"
+              x-on:click="modalIsOpen = false; $store.main.disconnectFromWebSocket()"
+              type="button"
+              class="whitespace-nowrap rounded-radius bg-primary border border-primary dark:border-primary-dark px-4 py-2 text-center text-sm font-medium tracking-wide text-on-primary transition hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:opacity-100 active:outline-offset-0 dark:bg-primary-dark dark:text-on-primary-dark dark:focus-visible:outline-primary-dark"
+            >
+              Close
+            </button>
+            <button
+              x-show="$store.main.buildStatus === 'success'"
+              x-on:click="$store.main.copyDownloadLink(); $store.main.copyLinkText = 'Copied!'"
+              type="button"
+              class="whitespace-nowrap rounded-radius bg-primary border border-primary dark:border-primary-dark px-4 py-2 text-center text-sm font-medium tracking-wide text-on-primary transition hover:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:opacity-100 active:outline-offset-0 dark:bg-primary-dark dark:text-on-primary-dark dark:focus-visible:outline-primary-dark"
+            >
+              <span x-text="$store.main.copyLinkText"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Build spec sidebar -->
+      <nav
+        x-cloak
+        x-show="sidebarIsOpen"
+        class="fixed right-0 z-20 flex h-svh w-120 shrink-0 flex-col border-l border-outline bg-surface-alt p-4 transition-transform duration-300 dark:border-outline-dark dark:bg-surface-dark-alt"
+        aria-label="shopping cart"
+        x-transition:enter="transition duration-200 ease-out"
+        x-transition:enter-end="translate-x-0"
+        x-transition:enter-start=" translate-x-80"
+        x-transition:leave="transition ease-in duration-200 "
+        x-transition:leave-end="translate-x-80"
+        x-transition:leave-start="translate-x-0"
+      >
+        <!-- sidebar header -->
+        <div class="flex items-center justify-between">
+          <h2
+            class="text-xl font-bold text-on-surface-strong dark:text-on-surface-dark-strong"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-clipboard-list-icon lucide-clipboard-list inline-block"
+            >
+              <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+              <path d="M12 11h4" />
+              <path d="M12 16h4" />
+              <path d="M8 11h.01" />
+              <path d="M8 16h.01" />
+            </svg>
+            Your Caddy Build Spec
+          </h2>
+        </div>
+
+        <!-- menu items -->
+        <div class="flex flex-col gap-2 overflow-y-auto py-4">
+          <!-- OS selection -->
+          <div
+            class="relative flex w-full flex-col gap-1 text-on-surface dark:text-on-surface-dark border-b-outline-dark border-b pb-4"
+          >
+            <label for="os" class="w-fit pl-0.5 text-sm"
+              >Operating System</label
+            >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="absolute pointer-events-none right-4 top-8 size-5"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <select
+              x-model="$store.main.os"
+              id="os"
+              name="os"
+              class="w-full appearance-none rounded-radius border border-outline bg-surface-alt px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-75 dark:border-outline-dark dark:bg-surface-dark-alt/50 dark:focus-visible:outline-primary-dark"
+              x-data="{ 
+                osOptions: [
+                  { value: 'dragonfly-amd64', label: 'Dragonfly amd64' },
+                  { value: 'freebsd-amd64', label: 'FreeBSD amd64' },
+                  { value: 'freebsd-arm-6', label: 'FreeBSD arm 6' },
+                  { value: 'freebsd-arm-7', label: 'FreeBSD arm 7' },
+                  { value: 'freebsd-arm64', label: 'FreeBSD arm64' },
+                  { value: 'linux-amd64', label: 'Linux amd64' },
+                  { value: 'linux-arm-5', label: 'Linux arm 5' },
+                  { value: 'linux-arm-6', label: 'Linux arm 6' },
+                  { value: 'linux-arm-7', label: 'Linux arm 7' },
+                  { value: 'linux-arm64', label: 'Linux arm64' },
+                  { value: 'linux-mips', label: 'Linux mips' },
+                  { value: 'linux-mips64', label: 'Linux mips64' },
+                  { value: 'linux-mips64le', label: 'Linux mips64le' },
+                  { value: 'linux-mipsle', label: 'Linux mipsle' },
+                  { value: 'linux-ppc64', label: 'Linux ppc64' },
+                  { value: 'linux-ppc64le', label: 'Linux ppc64le' },
+                  { value: 'linux-s390x', label: 'Linux s390x' },
+                  { value: 'linux-loong64', label: 'Linux loong64' },
+                  { value: 'darwin-amd64', label: 'macOS amd64 (Intel)' },
+                  { value: 'darwin-arm64', label: 'macOS arm64 (Apple)' },
+                  { value: 'openbsd-amd64', label: 'OpenBSD amd64' },
+                  { value: 'openbsd-arm-6', label: 'OpenBSD arm 6' },
+                  { value: 'openbsd-arm-7', label: 'OpenBSD arm 7' },
+                  { value: 'openbsd-arm64', label: 'OpenBSD arm64' },
+                  { value: 'windows-amd64', label: 'Windows amd64' },
+                  { value: 'windows-arm-6', label: 'Windows arm 6' },
+                  { value: 'windows-arm-7', label: 'Windows arm 7' },
+                  { value: 'windows-arm64', label: 'Windows arm64' }
+                ]
+              }"
+            >
+              <template x-for="option in osOptions" :key="option.value">
+                <option
+                  :value="option.value"
+                  x-text="option.label"
+                  :selected="$store.main.os === option.value"
+                ></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Caddy version selector -->
+          <!-- OS selection -->
+          <div
+            class="relative flex w-full flex-col gap-1 text-on-surface dark:text-on-surface-dark border-b-outline-dark border-b pb-4"
+          >
+            <label for="caddyVersion" class="w-fit pl-0.5 text-sm"
+              >Caddy Version</label
+            >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="absolute pointer-events-none right-4 top-8 size-5"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <select
+              x-model="$store.main.caddyVersion"
+              id="caddyVersion"
+              name="caddyVersion"
+              class="w-full appearance-none rounded-radius border border-outline bg-surface-alt px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-75 dark:border-outline-dark dark:bg-surface-dark-alt/50 dark:focus-visible:outline-primary-dark"
+            >
+              <template
+                x-for="version in $store.main.caddyVersions"
+                :key="version"
+              >
+                <option :value="version" x-text="version"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- products -->
+          <div
+            class="flex flex-col divide-y divide-outline dark:divide-outline-dark"
+          >
+            <!-- Empty state -->
+            <div
+              x-show="!$store.main.selectedCaddyModules.length"
+              class="flex flex-col gap-2 py-4 items-center justify-center text-neutral-700"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-package-search-icon lucide-package-search w-36 h-36"
+              >
+                <path
+                  d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"
+                />
+                <path d="m7.5 4.27 9 5.15" />
+                <polyline points="3.29 7 12 12 20.71 7" />
+                <line x1="12" x2="12" y1="22" y2="12" />
+                <circle cx="18.5" cy="15.5" r="2.5" />
+                <path d="M20.27 17.27 22 19" />
+              </svg>
+              <p class="text-md text-neutral-500 text-center">
+                No packages selected.<br /><br />Simply search and choose what
+                you want on the left and click "Build It"
+              </p>
+            </div>
+            <!-- product card -->
+            <template
+              x-for="selectedPackage in $store.main.selectedCaddyModules"
+              :key="selectedPackage.id"
+            >
+              <div
+                class="flex justify-between gap-4 py-4 border-b-outline-dark border-b pb-4"
+              >
+                <div class="mr-auto flex flex-col gap-2">
+                  <p
+                    class="text-sm font-bold font-mono leading-4 text-on-surface-strong dark:text-on-surface-dark-strong"
+                    x-text="selectedPackage.path"
+                  ></p>
+                  <p
+                    class="text-xs leading-4 text-on-surface dark:text-on-surface-dark"
+                  >
+                    Version:
+                    <input
+                      x-model="selectedPackage.version"
+                      id="counterInput1"
+                      type="text"
+                      class="ml-2 h-6 w-20 rounded-radius border-outline bg-surface-alt/50 text-center text-on-surface-strong focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-primary dark:border-outline-dark dark:bg-surface-dark-alt/50 dark:text-on-surface-dark-strong dark:focus-visible:outline-primary-dark border"
+                      placeholder="latest"
+                    />
+                  </p>
+                </div>
+                <div>
+                  <button
+                    @click="Alpine.store('main').togglePackageSelection(selectedPackage)"
+                    type="button"
+                    class="whitespace-nowrap rounded-radius bg-danger border border-secondary p-1 text-sm font-medium tracking-wide text-on-secondary transition hover:opacity-75 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:opacity-100 active:outline-offset-0 disabled:opacity-75 disabled:cursor-not-allowed dark:bg-danger/20 dark:border-danger/30 dark:text-secondary-dark dark:focus-visible:outline-secondary-dark"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="lucide lucide-trash2-icon lucide-trash-2"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      <line x1="10" x2="10" y1="11" y2="17" />
+                      <line x1="14" x2="14" y1="11" y2="17" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- sidebar footer -->
+        <div class="mt-auto">
+          <div>
+            <div class="relative w-full">
+              <button
+                @click="Alpine.store('main').submitBuild(); modalIsOpen = true"
+                type="button"
+                aria-describedby="tt2"
+                class="mt-2 flex w-full rounded-radius items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-center text-sm font-medium font-mono tracking-wide transition hover:opacity-75 active:opacity-100 active:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-75 bg-gradient-to-r from-pink-500/90 to-indigo-600 text-white"
+              >
+                <span>Build It</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  fill="none"
+                  stroke-width="2"
+                  class="size-4"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                  />
+                </svg>
+              </button>
+              <div
+                id="tt2"
+                class="absolute -top-9 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap rounded-sm bg-surface-dark px-2 py-1 text-center text-sm text-on-surface-dark-strong opacity-0 transition-all ease-out peer-hover:opacity-100 peer-focus:opacity-100 dark:bg-surface dark:text-on-surface-strong"
+                role="tooltip"
+              >
+                ... and they will come.
+              </div>
+            </div>
+            <div class="flex justify-center items-center gap-2 mt-4">
+              <span class="text-sm dark:text-secondary-dark/40">
+                Powered by
+                <a
+                  href="https://github.com/compy/prox-builder"
+                  target="_blank"
+                  class="text-primary dark:text-primary-dark"
+                  >Prox Builder</a
+                >
+              </span>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <!-- page content -->
+    <div
+      class="p-4 min-h-svh bg-surface dark:bg-surface-dark dark:text-on-surface-dark"
+    >
+      <div x-data class="w-8/12">
+        <div
+          class="relative flex w-full flex-col gap-1 text-on-surface dark:text-on-surface-dark mb-4"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            aria-hidden="true"
+            class="absolute left-2.5 top-1/2 size-6 -translate-y-1/2 text-on-surface/50 dark:text-on-surface-dark/50"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+            />
+          </svg>
+          <input
+            type="search"
+            class="w-full rounded-radius border border-outline bg-surface-alt py-2 pl-10 pr-2 text-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-75 dark:border-outline-dark dark:bg-surface-dark-alt/50 dark:focus-visible:outline-primary-dark"
+            name="search"
+            placeholder="Search"
+            aria-label="search"
+            x-model="$store.main.searchQuery"
+          />
+        </div>
+        <template
+          x-for="package in $store.main.caddyPackages"
+          :key="package.id"
+        >
+          <article
+            x-show="Alpine.store('main').packageMatchesSearch(package)"
+            @click="Alpine.store('main').togglePackageSelection(package)"
+            :class="{ 'bg-blue-950 border-blue-900': Alpine.store('main').isPackageSelected(package), 'bg-surface-alt dark:bg-surface-dark-alt dark:border-outline-dark dark:border': !Alpine.store('main').isPackageSelected(package) }"
+            class="group p-4 flex w-full flex-col border text-on-surface dark:text-on-surface-dark"
+          >
+            <div class="flex items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-package-icon lucide-package w-12 h-12"
+              >
+                <path
+                  d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
+                />
+                <path d="M12 22V12" />
+                <polyline points="3.29 7 12 12 20.71 7" />
+                <path d="m7.5 4.27 9 5.15" />
+              </svg>
+
+              <a
+                x-bind:href="package.repo"
+                target="_blank"
+                class="text-xl font-bold hover:text-primary dark:hover:text-primary-dark"
+              >
+                <span
+                  x-text="package.path.split('/')[0] + '/'"
+                  class="text-sm"
+                ></span>
+                <span
+                  x-text="package.path.split('/').slice(1).join('/')"
+                  class="text-2xl block"
+                ></span>
+              </a>
+            </div>
+            <!-- Module list and download counter -->
+            <div
+              class="flex flex-col-reverse md:flex-row md:items-center mt-4 justify-between gap-6"
+            >
+              <!-- Module list -->
+              <div class="">
+                <template x-for="module in package.modules" :key="module.name">
+                  <div class="ml-8">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="lucide lucide-plug-icon lucide-plug inline-block"
+                    >
+                      <path d="M12 22v-5" />
+                      <path d="M9 8V2" />
+                      <path d="M15 8V2" />
+                      <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
+                    </svg>
+                    <span
+                      x-text="module.name"
+                      class="font-mono font-bold text-blue-700 mr-2"
+                    ></span>
+                    <span x-text="module.docs" class="text-sm"></span>
+                  </div>
+                </template>
+              </div>
+              <!-- Download Counter -->
+              <div class="flex items-center gap-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="lucide lucide-cloud-download-icon lucide-cloud-download"
+                >
+                  <path d="M12 13v8l-4-4" />
+                  <path d="m12 21 4-4" />
+                  <path
+                    d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"
+                  />
+                </svg>
+                <span
+                  x-text="Number(package.downloads).toLocaleString()"
+                ></span>
+              </div>
+            </div>
+          </article>
+        </template>
+      </div>
+    </div>
+  </body>
+</html>
