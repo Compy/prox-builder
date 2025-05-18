@@ -202,6 +202,13 @@ function detectPlatform() {
 }
 
 function copyDownloadLink() {
+  // If the buildURL doesn't start with http: or https:, then add the current domain
+  if (
+    !store.buildURL.startsWith("http:") &&
+    !store.buildURL.startsWith("https:")
+  ) {
+    store.buildURL = `${window.location.origin}${store.buildURL}`;
+  }
   navigator.clipboard.writeText(store.buildURL);
   store.copyLinkText = "Copied!";
   setTimeout(() => {
