@@ -127,6 +127,12 @@ func main() {
 		// Start the process that updates the package list every hour
 		go keepPackageListFresh()
 
+		// Start the process that updates the caddy versions every hour
+		go keepCaddyVersionsFresh()
+
+		// Start the process that updates the caddy commit SHA every hour
+		go keepCaddyCommitSHAFresh()
+
 		// Start HTTP server for local processing
 		uiFilesystem, err := fs.Sub(embeddedUI, "ui/dist")
 		if err != nil {
@@ -301,4 +307,32 @@ func fetchCaddyReleases() ([]string, error) {
 	}
 
 	return versions, nil
+}
+
+func keepCaddyVersionsFresh() {
+	for {
+		log.Printf("Updating caddy versions")
+		// Clear out the caddy versions list
+		caddyVersions = []string{}
+		caddyVersions = append(caddyVersions, "latest")
+		caddyReleases, err := fetchCaddyReleases()
+
+		if err != nil {
+			log.Printf("Error fetching caddy versions: %v", err)
+		}
+		caddyVersions = append(caddyVersions, caddyReleases...)
+		time.Sleep(1 * time.Hour)
+	}
+}
+
+func keepCaddyCommitSHAFresh() {
+	for {
+		log.Printf("Updating caddy commit SHA")
+		var err error
+		caddyCommitSHA, err = fetchLatestCaddyCommitSHA()
+		if err != nil {
+			log.Printf("Error fetching caddy commit SHA: %v", err)
+		}
+		time.Sleep(5 * time.Minute)
+	}
 }
